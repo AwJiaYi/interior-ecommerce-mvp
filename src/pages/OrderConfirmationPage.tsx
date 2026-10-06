@@ -11,6 +11,7 @@ export default function OrderConfirmationPage() {
         <p className="eyebrow">Order submitted</p>
         <h1>Thank you.</h1>
         <p>Your order and payment proof have been submitted for verification.</p>
+        <p className="muted">Our team will review your payment proof and confirm delivery arrangements and any delivery charges separately.</p>
 
         <div className="confirmation-details">
           <div><span>Order ID</span><strong>{order?.orderNo || 'Submitted order'}</strong></div>

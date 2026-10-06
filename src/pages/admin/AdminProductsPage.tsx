@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Product } from '../../types'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import Loading from '../../components/Loading'
 
 type FormState = {
   id?: string
@@ -31,6 +32,7 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState<FormState>(blank)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [pending, setPending] = useState(false)
 
   async function ensureAdmin() {
     if (!isSupabaseConfigured || !supabase) {
@@ -56,21 +58,29 @@ export default function AdminProductsPage() {
 
   async function loadProducts() {
     if (!supabase) return
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    if (error) { setMessage('Unable to load products. Please refresh to try again.'); return }
     setProducts(data || [])
   }
 
   useEffect(() => {
     ;(async () => {
-      if (await ensureAdmin()) await loadProducts()
-      setLoading(false)
+      try {
+        if (await ensureAdmin()) await loadProducts()
+      } catch {
+        setMessage('Unable to load products. Please refresh to try again.')
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [])
 
   async function saveProduct(e: FormEvent) {
     e.preventDefault()
-    if (!supabase) return
+    if (!supabase || pending) return
     setMessage('')
+    setPending(true)
+    try {
 
     let imageUrl = form.existingImageUrl || null
     if (form.imageFile) {
@@ -108,13 +118,26 @@ export default function AdminProductsPage() {
     setForm(blank)
     setMessage('Product saved successfully.')
     await loadProducts()
+    } catch {
+      setMessage('Unable to save product. Please try again.')
+    } finally {
+      setPending(false)
+    }
   }
 
   async function deleteProduct(id: string) {
-    if (!supabase || !confirm('Delete this product?')) return
+    if (!supabase || pending || !confirm('Delete this product?')) return
+    setPending(true)
+    setMessage('')
+    try {
     const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) setMessage(error.message)
     else await loadProducts()
+    } catch {
+      setMessage('Unable to delete product. Please try again.')
+    } finally {
+      setPending(false)
+    }
   }
 
   async function logout() {
@@ -122,7 +145,7 @@ export default function AdminProductsPage() {
     navigate('/admin/login')
   }
 
-  if (loading) return <section className="section"><div className="container">Loading admin...</div></section>
+  if (loading) return <section className="section"><div className="container"><Loading label="Loading products…" /></div></section>
 
   return (
     <section className="section">
@@ -133,14 +156,15 @@ export default function AdminProductsPage() {
             <h1>Product management</h1>
           </div>
           <div className="admin-actions">
-            <button className="btn secondary" onClick={() => navigate('/admin/orders')}>Orders</button>
-            <button className="btn ghost" onClick={logout}>Logout</button>
+            <button className="btn secondary" disabled={pending} onClick={() => navigate('/admin/orders')}>Orders</button>
+            <button className="btn ghost" disabled={pending} onClick={logout}>Logout</button>
           </div>
         </div>
 
         <div className="admin-layout">
-          <form className="admin-card" onSubmit={saveProduct}>
+          <form className="admin-card" onSubmit={saveProduct} aria-busy={pending}>
             <h2>{form.id ? 'Edit product' : 'Add product'}</h2>
+            <fieldset className="form-fields" disabled={pending}><legend className="sr-only">Product details</legend>
             <label className="field"><span>Product name *</span>
               <input className="input" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
             </label>
@@ -163,18 +187,22 @@ export default function AdminProductsPage() {
             <label className="field"><span>Product image (JPG/PNG)</span>
               <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                 onChange={e => setForm({...form, imageFile: e.target.files?.[0] || null})} />
+              <small role="status">{form.imageFile ? `Selected: ${form.imageFile.name}` : form.existingImageUrl ? 'Current image will be kept unless you select a replacement.' : 'Select a JPG or PNG image.'}</small>
+              {(form.existingImageUrl && !form.imageFile) && <img className="upload-preview" src={form.existingImageUrl} alt="Current product image" />}
             </label>
             <label className="checkbox-row">
               <input type="checkbox" checked={form.featured}
                 onChange={e => setForm({...form, featured: e.target.checked})} />
               Featured product
             </label>
-            {message && <div className={message.includes('successfully') ? 'success-box' : 'error-box'}>{message}</div>}
-            <button className="btn primary full">{form.id ? 'Update product' : 'Add product'}</button>
-            {form.id && <button type="button" className="btn ghost full" onClick={() => setForm(blank)}>Cancel edit</button>}
+            </fieldset>
+            {message && <div role={message.includes('successfully') ? 'status' : 'alert'} className={message.includes('successfully') ? 'success-box' : 'error-box'}>{message}</div>}
+            <button className="btn primary full" disabled={pending}>{pending ? 'Working…' : form.id ? 'Update product' : 'Add product'}</button>
+            {form.id && <button type="button" disabled={pending} className="btn ghost full" onClick={() => setForm(blank)}>Cancel edit</button>}
           </form>
 
           <div className="admin-product-list">
+            {!products.length && <div className="empty-state"><h2>No products to display</h2><p className="muted">Use the product form to add your first piece.</p></div>}
             {products.map(product => (
               <article className="admin-product-row" key={product.id}>
                 <img src={product.image_url || '/products/lounge-chair.svg'} alt={product.name} />
@@ -183,7 +211,7 @@ export default function AdminProductsPage() {
                   <span>{product.category} · SGD {product.price.toFixed(2)}</span>
                 </div>
                 <div className="row-actions">
-                  <button className="btn small secondary" onClick={() => setForm({
+                  <button className="btn small secondary" disabled={pending} aria-label={`Edit ${product.name}`} onClick={() => setForm({
                     id: product.id,
                     name: product.name,
                     price: String(product.price),
@@ -194,7 +222,7 @@ export default function AdminProductsPage() {
                     imageFile: null,
                     existingImageUrl: product.image_url,
                   })}>Edit</button>
-                  <button className="btn small danger" onClick={() => deleteProduct(product.id)}>Delete</button>
+                  <button className="btn small danger" disabled={pending} aria-label={`Delete ${product.name}`} onClick={() => deleteProduct(product.id)}>Delete</button>
                 </div>
               </article>
             ))}

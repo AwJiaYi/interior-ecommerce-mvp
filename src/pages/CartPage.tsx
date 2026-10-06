@@ -52,8 +52,9 @@ export default function CartPage() {
           <aside className="summary-card">
             <h2>Order summary</h2>
             <div className="summary-row"><span>Subtotal</span><strong>SGD {total.toFixed(2)}</strong></div>
-            <div className="summary-row"><span>Delivery</span><span>Calculated by business</span></div>
-            <div className="summary-total"><span>Grand total</span><strong>SGD {total.toFixed(2)}</strong></div>
+            <div className="summary-row"><span>Delivery</span><span>Confirmed separately</span></div>
+            <div className="summary-total"><span>Items total</span><strong>SGD {total.toFixed(2)}</strong></div>
+            <p className="muted delivery-note">Any delivery charges will be confirmed separately by our team.</p>
             <Link to="/checkout" className="btn primary full">Proceed to checkout</Link>
           </aside>
         </div>

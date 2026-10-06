@@ -7,9 +7,11 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
+  const [pending, setPending] = useState(false)
 
   async function login(e: FormEvent) {
     e.preventDefault()
+    if (pending) return
     setMessage('')
 
     if (!isSupabaseConfigured || !supabase) {
@@ -17,6 +19,8 @@ export default function AdminLoginPage() {
       return
     }
 
+    setPending(true)
+    try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setMessage(error.message)
@@ -36,24 +40,29 @@ export default function AdminLoginPage() {
     }
 
     navigate('/admin/products')
+    } catch {
+      setMessage('Unable to sign in. Please try again.')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
     <section className="section">
       <div className="container narrow">
-        <form className="admin-card" onSubmit={login}>
+        <form className="admin-card" onSubmit={login} aria-busy={pending}>
           <p className="eyebrow">Owner access</p>
           <h1>Admin login</h1>
           <label className="field">
             <span>Email</span>
-            <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+            <input className="input" type="email" required autoComplete="username" disabled={pending} value={email} onChange={e => setEmail(e.target.value)} />
           </label>
           <label className="field">
             <span>Password</span>
-            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+            <input className="input" type="password" required autoComplete="current-password" disabled={pending} value={password} onChange={e => setPassword(e.target.value)} />
           </label>
-          {message && <div className="error-box">{message}</div>}
-          <button className="btn primary full">Login</button>
+          {message && <div className="error-box" role="alert">{message}</div>}
+          <button className="btn primary full" disabled={pending}>{pending ? 'Signing in…' : 'Login'}</button>
         </form>
       </div>
     </section>

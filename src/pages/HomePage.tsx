@@ -4,9 +4,12 @@ import type { Product } from '../types'
 import { demoProducts } from '../lib/demoProducts'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import ProductGrid from '../components/ProductGrid'
+import Loading from '../components/Loading'
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>(demoProducts.filter(p => p.featured).slice(0, 3))
+  const [loading, setLoading] = useState(isSupabaseConfigured)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return
@@ -16,8 +19,10 @@ export default function HomePage() {
       .eq('featured', true)
       .order('created_at', { ascending: false })
       .limit(3)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) setError('Unable to load featured products. Please refresh to try again.')
         if (data?.length) setProducts(data)
+        setLoading(false)
       })
   }, [])
 
@@ -37,11 +42,11 @@ export default function HomePage() {
             </div>
           </div>
           <div className="hero-panel">
-            <img src="/products/lounge-chair.svg" alt="Featured lounge chair" />
+            <img src="/hero-interior.png" alt="Featured lounge chair" />
             <div>
-              <span>Featured</span>
-              <strong>Sora Lounge Chair</strong>
-              <small>Natural textures, generous comfort.</small>
+              <span>Curated Interior</span>
+              <strong>Warm modern living</strong>
+              <small>Furniture, lighting and decor selected to work together.</small>
             </div>
           </div>
         </div>
@@ -56,7 +61,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="category-grid">
-            {['Seating', 'Lighting', 'Tables', 'Decor'].map(category => (
+            {['Seating', 'Lighting', 'Tables', 'Decor', 'Storage'].map(category => (
               <Link
                 key={category}
                 to={`/products?category=${encodeURIComponent(category)}`}
@@ -79,7 +84,8 @@ export default function HomePage() {
             </div>
             <Link to="/products" className="text-link">View all products →</Link>
           </div>
-          <ProductGrid products={products} />
+          {error && <div className="error-box" role="alert">{error}</div>}
+          {loading ? <Loading label="Loading featured pieces…" /> : !error && <ProductGrid products={products} />}
         </div>
       </section>
 

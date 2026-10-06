@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { CheckoutCustomer } from '../types'
@@ -18,12 +18,20 @@ export default function CheckoutPage() {
   const [proof, setProof] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState('')
+
+  useEffect(() => {
+    if (!proof) { setPreview(''); return }
+    const url = URL.createObjectURL(proof)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [proof])
 
   if (!items.length) {
     return (
       <section className="section">
         <div className="container empty-state">
-          Your cart is empty.
+          <h2>Your cart is empty</h2><p className="muted">Choose your pieces before checking out.</p><Link className="btn primary" to="/products">Browse products</Link>
         </div>
       </section>
     )
@@ -34,9 +42,10 @@ const orderNo = () =>
 
   async function submitOrder(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     setError('')
 
-    if (!customer.fullName || !customer.phone || !customer.email || !customer.address) {
+    if (!customer.fullName.trim() || !customer.phone.trim() || !customer.email.trim() || !customer.address.trim()) {
       setError('Please complete all required customer fields.')
       return
     }
@@ -103,29 +112,32 @@ const orderNo = () =>
   return (
     <section className="section">
       <div className="container checkout-grid">
-        <form className="checkout-form" onSubmit={submitOrder}>
+        <form className="checkout-form" onSubmit={submitOrder} aria-busy={submitting}>
           <p className="eyebrow">Checkout</p>
           <h1>Delivery & payment</h1>
+          <p className="muted">Enter your delivery details, then upload your payment screenshot. Fields marked * are required.</p>
 
+          <fieldset disabled={submitting} className="form-fields">
+          <legend className="sr-only">Delivery and payment details</legend>
           <div className="form-grid">
             <label className="field">
               <span>Full Name *</span>
-              <input className="input" value={customer.fullName}
+              <input className="input" required autoComplete="name" name="fullName" value={customer.fullName}
                 onChange={e => setCustomer({ ...customer, fullName: e.target.value })} />
             </label>
             <label className="field">
               <span>Phone Number *</span>
-              <input className="input" value={customer.phone}
+              <input className="input" required type="tel" autoComplete="tel" name="phone" value={customer.phone}
                 onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
             </label>
             <label className="field">
               <span>Email Address *</span>
-              <input className="input" type="email" value={customer.email}
+              <input className="input" required type="email" autoComplete="email" name="email" value={customer.email}
                 onChange={e => setCustomer({ ...customer, email: e.target.value })} />
             </label>
             <label className="field full-span">
               <span>Delivery Address *</span>
-              <textarea className="input textarea" value={customer.address}
+              <textarea className="input textarea" required autoComplete="street-address" name="address" value={customer.address}
                 onChange={e => setCustomer({ ...customer, address: e.target.value })} />
             </label>
           </div>
@@ -133,9 +145,10 @@ const orderNo = () =>
           <div className="payment-box">
             <div>
               <p className="eyebrow">NETSPay QR</p>
-              <h2>Scan to pay SGD {total.toFixed(2)}</h2>
+              <h2>Payment by NETSPay</h2>
+              <p><strong>Items total: SGD {total.toFixed(2)}</strong></p>
               <p className="muted">
-                For the MVP, replace this demo QR artwork with the client’s official NETSPay merchant QR image.
+                This QR is a demo placeholder. For this demo, select a payment screenshot below. Payment proof is reviewed manually by our team.
               </p>
             </div>
             <img src="/netspay-qr-placeholder.svg" alt="NETSPay QR placeholder" className="qr-image" />
@@ -145,13 +158,16 @@ const orderNo = () =>
             <span>Upload payment screenshot *</span>
             <input
               type="file"
+              required
               accept=".jpg,.jpeg,.png,image/jpeg,image/png"
               onChange={e => setProof(e.target.files?.[0] || null)}
             />
-            <small>{proof ? proof.name : 'JPG or PNG'}</small>
+            <small role="status">{proof ? `Selected: ${proof.name} · ${(proof.size / 1024).toFixed(0)} KB` : 'Select a JPG or PNG screenshot.'}</small>
+            {preview && <img className="upload-preview" src={preview} alt="Selected payment screenshot preview" />}
           </label>
+          </fieldset>
 
-          {error && <div className="error-box">{error}</div>}
+          {error && <div className="error-box" role="alert">{error}</div>}
 
           <button className="btn primary full" disabled={submitting}>
             {submitting ? 'Submitting order...' : 'Submit order'}
@@ -167,9 +183,10 @@ const orderNo = () =>
             </div>
           ))}
           <div className="summary-total">
-            <span>Total</span>
+            <span>Items total</span>
             <strong>SGD {total.toFixed(2)}</strong>
           </div>
+          <p className="muted delivery-note">Any delivery charges will be confirmed separately by our team. Payment remains subject to manual verification.</p>
         </aside>
       </div>
     </section>

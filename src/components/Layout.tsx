@@ -6,6 +6,7 @@ export default function Layout() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="site-header">
         <div className="container nav-wrap">
           <Link to="/" className="brand">
@@ -16,7 +17,7 @@ export default function Layout() {
             </span>
           </Link>
 
-          <nav>
+          <nav aria-label="Main navigation">
             <NavLink to="/">Home</NavLink>
             <NavLink to="/products">Shop</NavLink>
             <NavLink to="/cart">Cart ({count})</NavLink>
@@ -25,7 +26,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         <Outlet />
       </main>
 
